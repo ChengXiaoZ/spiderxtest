@@ -1,0 +1,249 @@
+--echo ##########################################################
+--connect (BACKEND1, $BACKEND1_IP, root, , , $BACKEND1_PORT, $BACKEND1_PORT)
+--connect (BACKEND2, $BACKEND2_IP, root, , , $BACKEND2_PORT, $BACKEND2_PORT)
+--connect (PROXY, $PROXY_IP, root, , , $PROXY_PORT, $PROXY_PORT)
+
+--echo drop and create databases on backend1
+--connection BACKEND1
+DROP DATABASE IF EXISTS DB1;
+CREATE DATABASE DB1;
+DROP DATABASE IF EXISTS DB2;
+CREATE DATABASE DB2;
+
+--echo drop and create databases on backend2
+--connection BACKEND2
+DROP DATABASE IF EXISTS DB1;
+CREATE DATABASE DB1;
+DROP DATABASE IF EXISTS DB2;
+CREATE DATABASE DB2;
+
+--echo ##########################################################
+
+--echo drop and create server on proxy
+--disable_warnings
+--disable_query_log
+--disable_result_log
+
+--connection PROXY
+
+if (`select count(*) from mysql.servers where server_name='backend1_db1'`)
+{
+	DROP SERVER backend1_db1;
+}
+if (`select count(*) from mysql.servers where server_name='backend1_db2'`)
+{
+	DROP SERVER backend1_db2;
+}
+if (`select count(*) from mysql.servers where server_name='backend2_db1'`)
+{
+	DROP SERVER backend2_db1;
+}
+if (`select count(*) from mysql.servers where server_name='backend2_db2'`)
+{
+	DROP SERVER backend2_db2;
+}
+
+eval CREATE SERVER backend1_db1 
+  FOREIGN DATA WRAPPER mysql 
+OPTIONS( 
+  HOST '$BACKEND1_IP',
+  PORT $BACKEND1_PORT, 
+  DATABASE 'db1',
+  USER 'root',
+  PASSWORD ''
+);
+
+eval CREATE SERVER backend1_db2
+  FOREIGN DATA WRAPPER mysql 
+OPTIONS( 
+  HOST '$BACKEND1_IP',
+  PORT $BACKEND1_PORT, 
+  DATABASE 'db2',
+  USER 'root',
+  PASSWORD ''
+);
+
+eval CREATE SERVER backend2_db1 
+  FOREIGN DATA WRAPPER mysql 
+OPTIONS( 
+  HOST '$BACKEND2_IP',
+  PORT $BACKEND2_PORT, 
+  DATABASE 'db1',
+  USER 'root',
+  PASSWORD ''
+);
+
+eval CREATE SERVER backend2_db2
+  FOREIGN DATA WRAPPER mysql 
+OPTIONS( 
+  HOST '$BACKEND2_IP',
+  PORT $BACKEND2_PORT, 
+  DATABASE 'db2',
+  USER 'root',
+  PASSWORD ''
+);
+
+--enable_warnings
+--enable_query_log
+--enable_result_log
+
+
+--echo ##########################################################
+
+#1.fed
+#1)
+--echo create remote table on backend1
+--connection BACKEND1
+create table db1.fed(a int , b float, c varchar(10), d char(10), e date);
+
+#2)
+--echo create spider table on proxy
+--connection PROXY
+let test_table=fed;
+let create_table_sql=create table fed(A int, B float, C varchar(10), D char(10), E date) 
+ENGINE = SPIDER CONNECTION='wrapper "mysql", table "FED" ,srv "backend1_db1"';
+--echo $create_table_sql
+
+#3)
+let spider_casual_read_value=0;
+let spider_bgs_mode_value=0;
+let test_des='fed no bgs';
+--source single_table_sql.inc
+
+let spider_casual_read_value=1;
+let spider_bgs_mode_value=2;
+let test_des='fed bgs';
+--source single_table_sql.inc
+
+--echo ##########################################################
+#2.share_range
+#1)
+--echo create remote table on backend1
+--connection BACKEND1
+create table db1.share_range(a int , b float, c varchar(10), d char(10), e date);
+
+--echo create remote table on backend2
+--connection BACKEND2
+create table db1.share_range(a int , b float, c varchar(10), d char(10), e date);
+
+#2)
+--echo create spider table on proxy
+--connection PROXY
+let test_table=share_range;
+let create_table_sql=create table $test_table(A int, B float, C varchar(10), D char(10), E date)
+ENGINE=SPIDER partition by range(A) 
+ (
+partition pt1 values less than (100) comment ' wrapper "mysql", table "share_range", srv "backend1_db1"',
+partition pt2 values less than maxvalue comment ' wrapper "mysql", table "share_range", srv "backend2_db1"');
+--echo $create_table_sql
+
+#3)
+let spider_casual_read_value=0;
+let spider_bgs_mode_value=0;
+let test_des='share_range no bgs';
+--source single_table_sql.inc
+
+let spider_casual_read_value=1;
+let spider_bgs_mode_value=2;
+let test_des='share_range bgs';
+--source single_table_sql.inc
+
+--echo ##########################################################
+#3.share_key
+#1)
+--echo create remote table on backend1
+--connection BACKEND1
+create table db1.share_key(a int , b float, c varchar(10), d char(10), e date);
+
+--echo create remote table on backend2
+--connection BACKEND2
+create table db1.share_key(a int , b float, c varchar(10), d char(10), e date);
+
+#2)
+--echo create spider table on proxy
+--connection PROXY
+let test_table=share_key;
+let create_table_sql=create table $test_table(A int, B float, C varchar(10), D char(10), E date)
+ENGINE=SPIDER partition by KEY(A) 
+(
+partition pt1 comment ' wrapper "mysql", table "SHARE_KEY", srv "backend1_db1"',
+partition pt2 comment ' wrapper "mysql", table "SHARE_KEY", srv "backend2_db1"');
+--echo $create_table_sql
+
+#3)
+let spider_casual_read_value=0;
+let spider_bgs_mode_value=0;
+let test_des='share_key no bgs';
+--source single_table_sql.inc
+
+let spider_casual_read_value=1;
+let spider_bgs_mode_value=2;
+let test_des='share_key bgs';
+--source single_table_sql.inc
+
+--echo ##########################################################
+#4.fed_ha
+#1)
+--echo create remote table on backend1
+--connection BACKEND1
+create table db1.fed_ha(a int , b float, c varchar(10), d char(10), e date);
+
+--echo create remote table on backend2
+--connection BACKEND2
+create table db2.fed_ha(a int , b float, c varchar(10), d char(10), e date);
+
+#2)
+--echo create spider table on proxy
+--connection PROXY
+let test_table=fed_ha;
+let create_table_sql=create table fed_ha(A int, B float, C varchar(10), D char(10), E date)
+ENGINE = SPIDER CONNECTION='wrapper "mysql", table "FED_HA", srv "backend1_db1 backend2_db2"';
+--echo $create_table_sql
+
+#3)
+let spider_casual_read_value=0;
+let spider_bgs_mode_value=0;
+let test_des='fed_ha no bgs';
+--source single_table_sql.inc
+
+let spider_casual_read_value=1;
+let spider_bgs_mode_value=2;
+let test_des='fed_ha bgs';
+--source single_table_sql.inc
+
+--echo ##########################################################
+#4.share_range_ha
+#1)
+--echo create remote table on backend1
+--connection BACKEND1
+create table db1.share_range_ha(a int , b float, c varchar(10), d char(10), e date);
+create table db2.share_range_ha(a int , b float, c varchar(10), d char(10), e date);
+
+--echo create remote table on backend2
+--connection BACKEND2
+create table db1.share_range_ha(a int , b float, c varchar(10), d char(10), e date);
+create table db2.share_range_ha(a int , b float, c varchar(10), d char(10), e date);
+
+#2)
+--echo create spider table on proxy
+--connection PROXY
+let test_table=share_range_ha;
+let create_table_sql=create table $test_table(A int, B float, C varchar(10), D char(10), E date)
+ENGINE=SPIDER partition by range(A) 
+ (
+partition pt1 values less than (100) 
+comment ' wrapper "mysql", table "SHARE_RANGE_HA", srv "backend1_db1 backend2_db2"',
+partition pt2 values less than maxvalue 
+comment ' wrapper "mysql", table "SHARE_RANGE_HA", srv "backend2_db1 backend1_db2"');
+--echo $create_table_sql
+
+#3)
+let spider_casual_read_value=0;
+let spider_bgs_mode_value=0;
+let test_des='share_range_ha no bgs';
+--source single_table_sql.inc
+
+let spider_casual_read_value=1;
+let spider_bgs_mode_value=2;
+let test_des='share_range_ha bgs';
+--source single_table_sql.inc

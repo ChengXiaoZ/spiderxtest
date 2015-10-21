@@ -1,0 +1,20 @@
+environment variables on linux
+export tip=192.168.226.2
+export BACKEND1_IP=192.168.226.1
+export BACKEND1_PORT=3310
+export BACKEND2_IP=192.168.226.1
+export BACKEND2_PORT=3320
+export PROXY_IP=127.0.0.1
+export PROXY_PORT=3306
+
+environment variables on windows
+SET tip=192.168.226.2
+SET BACKEND1_IP=192.168.226.1
+SET BACKEND1_PORT=3310
+SET BACKEND2_IP=192.168.226.1
+SET BACKEND2_PORT=3320
+SET PROXY_IP=127.0.0.1
+SET PROXY_PORT=3306
+
+./mysql-test-run.pl  spiderx.single_table
+./mysql-test-run.pl  spiderx.multi_table
