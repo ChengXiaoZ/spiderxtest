@@ -7,6 +7,11 @@ export BACKEND2_PORT=3320
 export PROXY_IP=127.0.0.1
 export PROXY_PORT=3306
 
+#ORA
+export ORA_BACKEND1_IP=192.168.226.1/orcl
+export ORA_BACKEND2_IP=192.168.226.1/orcl2
+
+###################################################
 environment variables on windows
 SET tip=192.168.226.2
 SET BACKEND1_IP=192.168.226.1
@@ -18,3 +23,5 @@ SET PROXY_PORT=3306
 
 ./mysql-test-run.pl  spiderx.single_table
 ./mysql-test-run.pl  spiderx.multi_table
+
+./mysql-test-run.pl  spiderx.ora_single_table
