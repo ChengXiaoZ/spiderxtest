@@ -1,121 +1,141 @@
---echo ##########################################################
---connect (BACKEND1, $BACKEND1_IP, root, , , $BACKEND1_PORT, $BACKEND1_PORT)
---connect (BACKEND2, $BACKEND2_IP, root, , , $BACKEND2_PORT, $BACKEND2_PORT)
+#--echo ##########################################################
 --connect (PROXY, $PROXY_IP, root, , , $PROXY_PORT, $PROXY_PORT)
-
---echo drop and create databases on backend1
---connection BACKEND1
-DROP DATABASE IF EXISTS DB1;
-CREATE DATABASE DB1;
-DROP DATABASE IF EXISTS DB2;
-CREATE DATABASE DB2;
-
---echo drop and create databases on backend2
---connection BACKEND2
-DROP DATABASE IF EXISTS DB1;
-CREATE DATABASE DB1;
-DROP DATABASE IF EXISTS DB2;
-CREATE DATABASE DB2;
-
---echo ##########################################################
+--connection PROXY
 
 --echo drop and create server on proxy
 --disable_warnings
 --disable_query_log
 --disable_result_log
 
---connection PROXY
+if (`select count(*) from mysql.servers where server_name='ora_backend1'`)
+{
+	DROP SERVER ora_backend1;
+}
+if (`select count(*) from mysql.servers where server_name='ora_backend2'`)
+{
+	DROP SERVER ora_backend2;
+}
+if (`select count(*) from mysql.servers where server_name='ora_backend1_db1'`)
+{
+	DROP SERVER ora_backend1_db1;
+}
+if (`select count(*) from mysql.servers where server_name='ora_backend1_db2'`)
+{
+	DROP SERVER ora_backend1_db2;
+}
+if (`select count(*) from mysql.servers where server_name='ora_backend2_db1'`)
+{
+	DROP SERVER ora_backend2_db1;
+}
+if (`select count(*) from mysql.servers where server_name='ora_backend2_db2'`)
+{
+	DROP SERVER ora_backend2_db2;
+}
 
-if (`select count(*) from mysql.servers where server_name='backend1_db1'`)
-{
-	DROP SERVER backend1_db1;
-}
-if (`select count(*) from mysql.servers where server_name='backend1_db2'`)
-{
-	DROP SERVER backend1_db2;
-}
-if (`select count(*) from mysql.servers where server_name='backend2_db1'`)
-{
-	DROP SERVER backend2_db1;
-}
-if (`select count(*) from mysql.servers where server_name='backend2_db2'`)
-{
-	DROP SERVER backend2_db2;
-}
-
-eval CREATE SERVER backend1_db1 
-  FOREIGN DATA WRAPPER mysql 
+eval CREATE SERVER ora_backend1
+  FOREIGN DATA WRAPPER oracle 
 OPTIONS( 
-  HOST '$BACKEND1_IP',
-  PORT $BACKEND1_PORT, 
-  DATABASE 'db1',
-  USER 'root',
-  PASSWORD ''
+  HOST '$ORA_BACKEND1_IP',
+  PORT $ORA_BACKEND1_PORT,   
+  DATABASE '$ORA_DATABASE',
+  USER '$ORA_USER',
+  PASSWORD '$ORA_PWD'
 );
 
-eval CREATE SERVER backend1_db2
-  FOREIGN DATA WRAPPER mysql 
+eval CREATE SERVER ora_backend2
+  FOREIGN DATA WRAPPER oracle 
 OPTIONS( 
-  HOST '$BACKEND1_IP',
-  PORT $BACKEND1_PORT, 
-  DATABASE 'db2',
-  USER 'root',
-  PASSWORD ''
+  HOST '$ORA_BACKEND2_IP',
+  PORT $ORA_BACKEND2_PORT,   
+  DATABASE '$ORA_DATABASE',
+  USER '$ORA_USER',
+  PASSWORD '$ORA_PWD'
 );
 
-eval CREATE SERVER backend2_db1 
-  FOREIGN DATA WRAPPER mysql 
+eval CREATE SERVER ora_backend1_db1 
+  FOREIGN DATA WRAPPER oracle 
 OPTIONS( 
-  HOST '$BACKEND2_IP',
-  PORT $BACKEND2_PORT, 
-  DATABASE 'db1',
-  USER 'root',
-  PASSWORD ''
+  HOST '$ORA_BACKEND1_IP',
+  PORT $ORA_BACKEND1_PORT,   
+  DATABASE 'DB1',
+  USER 'db1',
+  PASSWORD 'abc123'
 );
 
-eval CREATE SERVER backend2_db2
-  FOREIGN DATA WRAPPER mysql 
+eval CREATE SERVER ora_backend1_db2
+  FOREIGN DATA WRAPPER oracle 
 OPTIONS( 
-  HOST '$BACKEND2_IP',
-  PORT $BACKEND2_PORT, 
-  DATABASE 'db2',
-  USER 'root',
-  PASSWORD ''
+  HOST '$ORA_BACKEND1_IP',
+  DATABASE 'DB2',
+  USER 'db2',
+  PASSWORD 'abc123'
+);
+
+eval CREATE SERVER ora_backend2_db1 
+  FOREIGN DATA WRAPPER oracle 
+OPTIONS( 
+  HOST '$ORA_BACKEND2_IP',
+  DATABASE 'DB1',
+  USER 'db1',
+  PASSWORD 'abc123'
+);
+
+eval CREATE SERVER ora_backend2_db2
+  FOREIGN DATA WRAPPER oracle 
+OPTIONS( 
+  HOST '$ORA_BACKEND2_IP',
+  DATABASE 'DB2',
+  USER 'db2',
+  PASSWORD 'abc123'
 );
 
 --enable_warnings
 --enable_query_log
 --enable_result_log
 
+#--echo ##########################################################
+#--echo drop and create user on backend1
+SELECT SPIDER_DIRECT_SQL('drop user db1 cascade', '', 'srv "ora_backend1"');
+SELECT SPIDER_DIRECT_SQL('create user db1 identified by abc123', '', 'srv "ora_backend1"');
+SELECT SPIDER_DIRECT_SQL('grant dba to db1', '', 'srv "ora_backend1"');
+SELECT SPIDER_DIRECT_SQL('drop user db2 cascade', '', 'srv "ora_backend1"');
+SELECT SPIDER_DIRECT_SQL('create user db2 identified by abc123', '', 'srv "ora_backend1"');
+SELECT SPIDER_DIRECT_SQL('grant dba to db2', '', 'srv "ora_backend1"');
+
+#--echo drop and create user on backend2
+SELECT SPIDER_DIRECT_SQL('drop user db1 cascade', '', 'srv "ora_backend2"');
+SELECT SPIDER_DIRECT_SQL('create user db1 identified by abc123', '', 'srv "ora_backend2"');
+SELECT SPIDER_DIRECT_SQL('grant dba to db1', '', 'srv "ora_backend2"');
+SELECT SPIDER_DIRECT_SQL('drop user db2 cascade', '', 'srv "ora_backend2"');
+SELECT SPIDER_DIRECT_SQL('create user db2 identified by abc123', '', 'srv "ora_backend2"');
+SELECT SPIDER_DIRECT_SQL('grant dba to db2', '', 'srv "ora_backend2"');
+
 
 --echo ##########################################################
 #1.fed
 #1)
 --echo create remote table on backend1
---connection BACKEND1
-create table db1.s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int);
-create table db1.c(cno 	int primary key,cname varchar(50),pcno 	int);
-create table db1.sc(sno int,cno int,grade int);
-
+SELECT SPIDER_DIRECT_SQL('create table s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int)', '', 'srv "ora_backend1_db1"');
+SELECT SPIDER_DIRECT_SQL('create table c(cno 	int primary key,cname varchar(50),pcno 	int)', '', 'srv "ora_backend1_db1"');
+SELECT SPIDER_DIRECT_SQL('create table sc(sno int,cno int,grade int)', '', 'srv "ora_backend1_db1"');
 
 #2)
 --echo create spider table on proxy
---connection PROXY
 let test_table_s=fed_s;
 let test_table_c=fed_c;
 let test_table_sc=fed_sc;
 
 let create_s_sql=create table fed_s(SNO 	int primary key,SNAME	varchar(50),SDEPT 	varchar(50),AGE 	int) 
 CHARSET=utf8 ENGINE = SPIDER 
-CONNECTION='wrapper "mysql", table "S", srv "backend1_db1"';
+CONNECTION='wrapper "oracle", table "S", srv "ora_backend1_db1"';
 
 let create_c_sql=create table fed_c(CNO 	int   primary key,CNAME varchar(50),PCNO 	int) 
 CHARSET=utf8 ENGINE = SPIDER 
-CONNECTION='wrapper "mysql", table "C", srv "backend1_db1"';
+CONNECTION='wrapper "oracle", table "C", srv "ora_backend1_db1"';
 
 let create_sc_sql=create table fed_sc(SNO int,CNO int,GRADE int) 
 CHARSET=utf8 ENGINE = SPIDER 
-CONNECTION='wrapper "mysql", table "SC", srv "backend1_db1"';
+CONNECTION='wrapper "oracle", table "SC", srv "ora_backend1_db1"';
 
 #3)
 
@@ -133,21 +153,18 @@ let test_des='fed_s bgs';
 #2	share_range
 #1)
 --echo create remote table on backend1
---connection BACKEND1
-create table db1.share_range_s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int);
-create table db1.share_range_c(cno 	int primary key,cname varchar(50),pcno 	int);
-create table db1.share_range_sc(sno int,cno int,grade int);
+SELECT SPIDER_DIRECT_SQL('create table share_range_s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int)', '', 'srv "ora_backend1_db1"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_c(cno 	int primary key,cname varchar(50),pcno 	int)', '', 'srv "ora_backend1_db1"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_sc(sno int,cno int,grade int)', '', 'srv "ora_backend1_db1"');
 
 --echo create remote table on backend2
---connection BACKEND2
-create table db1.share_range_s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int);
-create table db1.share_range_c(cno 	int primary key,cname varchar(50),pcno 	int);
-create table db1.share_range_sc(sno int,cno int,grade int);
+SELECT SPIDER_DIRECT_SQL('create table share_range_s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int)', '', 'srv "ora_backend2_db1"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_c(cno 	int primary key,cname varchar(50),pcno 	int)', '', 'srv "ora_backend2_db1"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_sc(sno int,cno int,grade int)', '', 'srv "ora_backend2_db1"');
 
 
 #2)
 --echo create spider table on proxy
---connection PROXY
 
 let test_table_s=share_range_s;
 let test_table_c=share_range_c;
@@ -157,23 +174,23 @@ let create_s_sql=create table $test_table_s(SNO 	int primary key,SNAME	varchar(5
 ENGINE=SPIDER partition by range(SNO) 
  (
 partition pt1 values less than (2000) 
-comment ' wrapper "mysql", table "SHARE_RANGE_S", srv "backend1_db1"',
+comment ' wrapper "oracle", table "SHARE_RANGE_S", srv "ora_backend1_db1"',
 partition pt2 values less than maxvalue 
-comment ' wrapper "mysql", table "SHARE_RANGE_S", srv "backend2_db1"');
+comment ' wrapper "oracle", table "SHARE_RANGE_S", srv "ora_backend2_db1"');
 
 let create_c_sql=create table $test_table_c(CNO 	int   primary key,CNAME varchar(50),PCNO 	int) 
 ENGINE=SPIDER partition by range(CNO) 
  (
 partition pt1 values less than (50) 
-comment ' wrapper "mysql", table "SHARE_RANGE_C", srv "backend1_db1"',
+comment ' wrapper "oracle", table "SHARE_RANGE_C", srv "ora_backend1_db1"',
 partition pt2 values less than maxvalue 
-comment ' wrapper "mysql", table "SHARE_RANGE_C", srv "backend2_db1"');
+comment ' wrapper "oracle", table "SHARE_RANGE_C", srv "ora_backend2_db1"');
 
 let create_sc_sql=create table $test_table_sc(SNO int,CNO int,GRADE int) 
 ENGINE=SPIDER partition by KEY(CNO) 
  (
-partition pt1 comment ' wrapper "mysql", table "SHARE_RANGE_SC", srv "backend1_db1"',
-partition pt2 comment ' wrapper "mysql", table "SHARE_RANGE_SC", srv "backend2_db1"');
+partition pt1 comment ' wrapper "oracle", table "SHARE_RANGE_SC", srv "ora_backend1_db1"',
+partition pt2 comment ' wrapper "oracle", table "SHARE_RANGE_SC", srv "ora_backend2_db1"');
 
 #3)
 let spider_casual_read_value=0;
@@ -191,23 +208,20 @@ let test_des='share_range_s bgs';
 #4.fed_ha
 #1)
 --echo create remote table on backend1
---connection BACKEND1
-create table db1.s_ha(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int);
-create table db1.c_ha(cno 	int primary key,cname varchar(50),pcno 	int);
-create table db1.sc_ha(sno int,cno int,grade int);
+SELECT SPIDER_DIRECT_SQL('create table s_ha(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int)', '', 'srv "ora_backend1_db1"');
+SELECT SPIDER_DIRECT_SQL('create table c_ha(cno 	int primary key,cname varchar(50),pcno 	int)', '', 'srv "ora_backend1_db1"');
+SELECT SPIDER_DIRECT_SQL('create table sc_ha(sno int,cno int,grade int)', '', 'srv "ora_backend1_db1"');
 
 
 --echo create remote table on backend2
---connection BACKEND2
-create table db2.s_ha(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int);
-create table db2.c_ha(cno 	int primary key,cname varchar(50),pcno 	int);
-create table db2.sc_ha(sno int,cno int,grade int);
+SELECT SPIDER_DIRECT_SQL('create table s_ha(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int)', '', 'srv "ora_backend2_db2"');
+SELECT SPIDER_DIRECT_SQL('create table c_ha(cno 	int primary key,cname varchar(50),pcno 	int)', '', 'srv "ora_backend2_db2"');
+SELECT SPIDER_DIRECT_SQL('create table sc_ha(sno int,cno int,grade int)', '', 'srv "ora_backend2_db2"');
 
 
 
 #2)
 --echo create spider table on proxy
---connection PROXY
 
 let test_table_s=fed_ha_s;
 let test_table_c=fed_ha_c;
@@ -215,15 +229,15 @@ let test_table_sc=fed_ha_sc;
 
 let create_s_sql=create table fed_ha_s(SNO 	int primary key,SNAME	varchar(50),SDEPT 	varchar(50),AGE 	int) 
 CHARSET=utf8 ENGINE = SPIDER 
-CONNECTION='wrapper "mysql", table "S_HA", srv "backend1_db1 backend2_db2"';
+CONNECTION='wrapper "oracle", table "S_HA", srv "ora_backend1_db1 ora_backend2_db2"';
 
 let create_c_sql=create table fed_ha_c(CNO 	int   primary key,CNAME varchar(50),PCNO 	int) 
 CHARSET=utf8 ENGINE = SPIDER 
-CONNECTION='wrapper "mysql", table "C_HA", srv "backend1_db1 backend2_db2"';
+CONNECTION='wrapper "oracle", table "C_HA", srv "ora_backend1_db1 ora_backend2_db2"';
 
 let create_sc_sql=create table fed_ha_sc(SNO int,CNO int,GRADE int) 
 CHARSET=utf8 ENGINE = SPIDER 
-CONNECTION='wrapper "mysql", table "SC_HA", srv "backend1_db1 backend2_db2"';
+CONNECTION='wrapper "oracle", table "SC_HA", srv "ora_backend1_db1 ora_backend2_db2"';
 
 #3)
 let spider_casual_read_value=0;
@@ -240,27 +254,25 @@ let test_des='fed_ha_s bgs';
 #4.share_range_ha
 #1)
 --echo create remote table on backend1
---connection BACKEND1
-create table db1.share_range_ha_s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int);
-create table db1.share_range_ha_c(cno 	int primary key,cname varchar(50),pcno 	int);
-create table db1.share_range_ha_sc(sno int,cno int,grade int);
-create table db2.share_range_ha_s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int);
-create table db2.share_range_ha_c(cno 	int primary key,cname varchar(50),pcno 	int);
-create table db2.share_range_ha_sc(sno int,cno int,grade int);
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha_s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int)', '', 'srv "ora_backend1_db1"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha_c(cno 	int primary key,cname varchar(50),pcno 	int)', '', 'srv "ora_backend1_db1"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha_sc(sno int,cno int,grade int)', '', 'srv "ora_backend1_db1"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha_s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int)', '', 'srv "ora_backend1_db2"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha_c(cno 	int primary key,cname varchar(50),pcno 	int)', '', 'srv "ora_backend1_db2"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha_sc(sno int,cno int,grade int)', '', 'srv "ora_backend1_db2"');
 
 
 --echo create remote table on backend2
---connection BACKEND2
-create table db1.share_range_ha_s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int);
-create table db1.share_range_ha_c(cno 	int primary key,cname varchar(50),pcno 	int);
-create table db1.share_range_ha_sc(sno int,cno int,grade int);
-create table db2.share_range_ha_s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int);
-create table db2.share_range_ha_c(cno 	int primary key,cname varchar(50),pcno 	int);
-create table db2.share_range_ha_sc(sno int,cno int,grade int);
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha_s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int)', '', 'srv "ora_backend2_db1"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha_c(cno 	int primary key,cname varchar(50),pcno 	int)', '', 'srv "ora_backend2_db1"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha_sc(sno int,cno int,grade int)', '', 'srv "ora_backend2_db1"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha_s(sno 	int primary key,sname	varchar(50),sdept 	varchar(50),age 	int)', '', 'srv "ora_backend2_db2"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha_c(cno 	int primary key,cname varchar(50),pcno 	int)', '', 'srv "ora_backend2_db2"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha_sc(sno int,cno int,grade int)', '', 'srv "ora_backend2_db2"');
+
 
 #2)
 --echo create spider table on proxy
---connection PROXY
 let test_table_s=share_range_ha_s;
 let test_table_c=share_range_ha_c;
 let test_table_sc=share_range_ha_sc;
@@ -269,23 +281,23 @@ let create_s_sql=create table $test_table_s(SNO 	int primary key,SNAME	varchar(5
 ENGINE=SPIDER partition by range(SNO) 
  (
 partition pt1 values less than (2000) 
-comment ' wrapper "mysql", table "SHARE_RANGE_HA_S", srv "backend1_db1 backend2_db2"',
+comment ' wrapper "oracle", table "SHARE_RANGE_HA_S", srv "ora_backend1_db1 ora_backend2_db2"',
 partition pt2 values less than maxvalue 
-comment ' wrapper "mysql", table "SHARE_RANGE_HA_S", srv "backend2_db1 backend1_db2"');
+comment ' wrapper "oracle", table "SHARE_RANGE_HA_S", srv "ora_backend2_db1 ora_backend1_db2"');
 
 let create_c_sql=create table $test_table_c(CNO 	int   primary key,CNAME varchar(50),PCNO 	int) 
 ENGINE=SPIDER partition by range(CNO) 
  (
 partition pt1 values less than (50) 
-comment ' wrapper "mysql", table "SHARE_RANGE_HA_C", srv "backend1_db1 backend2_db2"',
+comment ' wrapper "oracle", table "SHARE_RANGE_HA_C", srv "ora_backend1_db1 ora_backend2_db2"',
 partition pt2 values less than maxvalue 
-comment ' wrapper "mysql", table "SHARE_RANGE_HA_C", srv "backend2_db1 backend1_db2"');
+comment ' wrapper "oracle", table "SHARE_RANGE_HA_C", srv "ora_backend2_db1 ora_backend1_db2"');
 
 let create_sc_sql=create table $test_table_sc(SNO int,CNO int,GRADE int) 
 ENGINE=SPIDER partition by KEY(CNO) 
  (
-partition pt1 comment ' wrapper "mysql", table "SHARE_RANGE_HA_SC", srv "backend1_db1 backend2_db2"',
-partition pt2 comment ' wrapper "mysql", table "SHARE_RANGE_HA_SC", srv "backend2_db1 backend1_db2"');
+partition pt1 comment ' wrapper "oracle", table "SHARE_RANGE_HA_SC", srv "ora_backend1_db1 ora_backend2_db2"',
+partition pt2 comment ' wrapper "oracle", table "SHARE_RANGE_HA_SC", srv "ora_backend2_db1 ora_backend1_db2"');
 
 #3)
 let spider_casual_read_value=0;
