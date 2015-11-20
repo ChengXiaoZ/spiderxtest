@@ -1,31 +1,20 @@
 #--echo ##########################################################
-#--connect (BACKEND1, $BACKEND1_IP, root, , , $BACKEND1_PORT, $BACKEND1_PORT)
-#--connect (BACKEND2, $BACKEND2_IP, root, , , $BACKEND2_PORT, $BACKEND2_PORT)
 --connect (PROXY, $PROXY_IP, root, , , $PROXY_PORT, $PROXY_PORT)
-
-#--echo drop and create databases on backend1
-#--connection BACKEND1
-#DROP DATABASE IF EXISTS DB1;
-#CREATE DATABASE DB1;
-#DROP DATABASE IF EXISTS DB2;
-#CREATE DATABASE DB2;
-
-#--echo drop and create databases on backend2
-#--connection BACKEND2
-#DROP DATABASE IF EXISTS DB1;
-#CREATE DATABASE DB1;
-#DROP DATABASE IF EXISTS DB2;
-#CREATE DATABASE DB2;
-
---echo ##########################################################
+--connection PROXY
 
 --echo drop and create server on proxy
 --disable_warnings
 --disable_query_log
 --disable_result_log
 
---connection PROXY
-
+if (`select count(*) from mysql.servers where server_name='ora_backend1'`)
+{
+	DROP SERVER ora_backend1;
+}
+if (`select count(*) from mysql.servers where server_name='ora_backend2'`)
+{
+	DROP SERVER ora_backend2;
+}
 if (`select count(*) from mysql.servers where server_name='ora_backend1_db1'`)
 {
 	DROP SERVER ora_backend1_db1;
@@ -43,10 +32,31 @@ if (`select count(*) from mysql.servers where server_name='ora_backend2_db2'`)
 	DROP SERVER ora_backend2_db2;
 }
 
+eval CREATE SERVER ora_backend1
+  FOREIGN DATA WRAPPER oracle 
+OPTIONS( 
+  HOST '$ORA_BACKEND1_IP',
+  PORT $ORA_BACKEND1_PORT,   
+  DATABASE '$ORA_DATABASE',
+  USER '$ORA_USER',
+  PASSWORD '$ORA_PWD'
+);
+
+eval CREATE SERVER ora_backend2
+  FOREIGN DATA WRAPPER oracle 
+OPTIONS( 
+  HOST '$ORA_BACKEND2_IP',
+  PORT $ORA_BACKEND2_PORT,   
+  DATABASE '$ORA_DATABASE',
+  USER '$ORA_USER',
+  PASSWORD '$ORA_PWD'
+);
+
 eval CREATE SERVER ora_backend1_db1 
   FOREIGN DATA WRAPPER oracle 
 OPTIONS( 
   HOST '$ORA_BACKEND1_IP',
+  PORT $ORA_BACKEND1_PORT,   
   DATABASE 'DB1',
   USER 'db1',
   PASSWORD 'abc123'
@@ -83,15 +93,29 @@ OPTIONS(
 --enable_query_log
 --enable_result_log
 
+#--echo ##########################################################
+#--echo drop and create user on backend1
+SELECT SPIDER_DIRECT_SQL('drop user db1 cascade', '', 'srv "ora_backend1"');
+SELECT SPIDER_DIRECT_SQL('create user db1 identified by abc123', '', 'srv "ora_backend1"');
+SELECT SPIDER_DIRECT_SQL('grant dba to db1', '', 'srv "ora_backend1"');
+SELECT SPIDER_DIRECT_SQL('drop user db2 cascade', '', 'srv "ora_backend1"');
+SELECT SPIDER_DIRECT_SQL('create user db2 identified by abc123', '', 'srv "ora_backend1"');
+SELECT SPIDER_DIRECT_SQL('grant dba to db2', '', 'srv "ora_backend1"');
+
+#--echo drop and create user on backend2
+SELECT SPIDER_DIRECT_SQL('drop user db1 cascade', '', 'srv "ora_backend2"');
+SELECT SPIDER_DIRECT_SQL('create user db1 identified by abc123', '', 'srv "ora_backend2"');
+SELECT SPIDER_DIRECT_SQL('grant dba to db1', '', 'srv "ora_backend2"');
+SELECT SPIDER_DIRECT_SQL('drop user db2 cascade', '', 'srv "ora_backend2"');
+SELECT SPIDER_DIRECT_SQL('create user db2 identified by abc123', '', 'srv "ora_backend2"');
+SELECT SPIDER_DIRECT_SQL('grant dba to db2', '', 'srv "ora_backend2"');
 
 --echo ##########################################################
 
 #1.fed
 #1)
 #--echo create remote table on backend1
-#--connection BACKEND1
-#create table db1.fed(a int , b float, c varchar(10), d char(10), e date);
-#create table fed(a int , b float, c varchar(10), d char(10), e date);
+SELECT SPIDER_DIRECT_SQL('create table fed(A int, B float, C varchar(10), D char(10), E date)', '', 'srv "ora_backend1_db1"');
 
 #2)
 #--echo create spider table on proxy
@@ -116,12 +140,10 @@ let test_des='fed bgs';
 #2.share_range
 #1)
 #--echo create remote table on backend1
-#--connection BACKEND1
-#create table db1.share_range(a int , b float, c varchar(10), d char(10), e date);
+SELECT SPIDER_DIRECT_SQL('create table share_range(a int , b float, c varchar(10), d char(10), e date)', '', 'srv "ora_backend1_db1"');
 
 #--echo create remote table on backend2
-#--connection BACKEND2
-#create table db1.share_range(a int , b float, c varchar(10), d char(10), e date);
+SELECT SPIDER_DIRECT_SQL('create table share_range(a int , b float, c varchar(10), d char(10), e date)', '', 'srv "ora_backend2_db1"');
 
 #2)
 --echo create spider table on proxy
@@ -149,12 +171,10 @@ let test_des='share_range bgs';
 #3.share_key
 #1)
 #--echo create remote table on backend1
-#--connection BACKEND1
-#create table db1.share_key(a int , b float, c varchar(10), d char(10), e date);
+SELECT SPIDER_DIRECT_SQL('create table share_key(a int , b float, c varchar(10), d char(10), e date)', '', 'srv "ora_backend1_db1"');
 
 #--echo create remote table on backend2
-#--connection BACKEND2
-#create table db1.share_key(a int , b float, c varchar(10), d char(10), e date);
+SELECT SPIDER_DIRECT_SQL('create table share_key(a int , b float, c varchar(10), d char(10), e date)', '', 'srv "ora_backend2_db1"');
 
 #2)
 --echo create spider table on proxy
@@ -182,12 +202,11 @@ let test_des='share_key bgs';
 #4.fed_ha
 #1)
 #--echo create remote table on backend1
-#--connection BACKEND1
-#create table db1.fed_ha(a int , b float, c varchar(10), d char(10), e date);
+SELECT SPIDER_DIRECT_SQL('create table fed_ha(a int , b float, c varchar(10), d char(10), e date)', '', 'srv "ora_backend1_db1"');
 
 #--echo create remote table on backend2
-#--connection BACKEND2
-#create table db2.fed_ha(a int , b float, c varchar(10), d char(10), e date);
+SELECT SPIDER_DIRECT_SQL('create table fed_ha(a int , b float, c varchar(10), d char(10), e date)', '', 'srv "ora_backend2_db2"');
+
 
 #2)
 --echo create spider table on proxy
@@ -212,14 +231,13 @@ let test_des='fed_ha bgs';
 #5.share_range_ha
 #1)
 #--echo create remote table on backend1
-#--connection BACKEND1
-#create table db1.share_range_ha(a int , b float, c varchar(10), d char(10), e date);
-#create table db2.share_range_ha(a int , b float, c varchar(10), d char(10), e date);
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha(a int , b float, c varchar(10), d char(10), e date)', '', 'srv "ora_backend1_db1"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha(a int , b float, c varchar(10), d char(10), e date)', '', 'srv "ora_backend1_db2"');
+
 
 #--echo create remote table on backend2
-#--connection BACKEND2
-#create table db1.share_range_ha(a int , b float, c varchar(10), d char(10), e date);
-#create table db2.share_range_ha(a int , b float, c varchar(10), d char(10), e date);
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha(a int , b float, c varchar(10), d char(10), e date)', '', 'srv "ora_backend2_db1"');
+SELECT SPIDER_DIRECT_SQL('create table share_range_ha(a int , b float, c varchar(10), d char(10), e date)', '', 'srv "ora_backend2_db2"');
 
 #2)
 --echo create spider table on proxy
@@ -244,4 +262,3 @@ let spider_casual_read_value=1;
 let spider_bgs_mode_value=2;
 let test_des='share_range_ha bgs';
 --source single_table_sql.inc
-

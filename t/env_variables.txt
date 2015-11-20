@@ -1,4 +1,5 @@
-environment variables on linux
+#environment variables on linux
+
 export tip=192.168.226.2
 export BACKEND1_IP=192.168.226.1
 export BACKEND1_PORT=3310
@@ -11,8 +12,17 @@ export PROXY_PORT=3306
 export ORA_BACKEND1_IP=192.168.226.1/orcl
 export ORA_BACKEND2_IP=192.168.226.1/orcl2
 
+export ORA_BACKEND1_PORT=1521
+export ORA_BACKEND2_PORT=1521
+
+export ORA_DATABASE=SYSTEM
+export ORA_USER=system
+export ORA_PWD=orcl123456
+
+
 ###################################################
-environment variables on windows
+#environment variables on windows
+
 SET tip=192.168.226.2
 SET BACKEND1_IP=192.168.226.1
 SET BACKEND1_PORT=3310
@@ -25,3 +35,4 @@ SET PROXY_PORT=3306
 ./mysql-test-run.pl  spiderx.multi_table
 
 ./mysql-test-run.pl  spiderx.ora_single_table
+./mysql-test-run.pl  spiderx.ora_multi_table
