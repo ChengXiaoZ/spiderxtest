@@ -31,8 +31,10 @@ SET BACKEND2_PORT=3320
 SET PROXY_IP=127.0.0.1
 SET PROXY_PORT=3306
 
-./mysql-test-run.pl  spiderx.single_table
-./mysql-test-run.pl  spiderx.multi_table
+###################################################
 
-./mysql-test-run.pl  spiderx.ora_single_table
-./mysql-test-run.pl  spiderx.ora_multi_table
+./mysql-test-run.pl  spiderxtest.single_table
+./mysql-test-run.pl  spiderxtest.multi_table
+
+./mysql-test-run.pl  spiderxtest.ora_single_table
+./mysql-test-run.pl  spiderxtest.ora_multi_table
